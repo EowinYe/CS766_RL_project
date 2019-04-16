@@ -34,7 +34,7 @@ SAVE_NETWORK_PATH = 'saved_networks/' + MODEL_NAME + ENV_NAME
 SAVE_SUMMARY_PATH = 'summary/' + MODEL_NAME + ENV_NAME
 NUM_EPISODES_AT_TEST = 10  # Number of episodes the agent plays at test time
 
-# Deep Q Network off-policy
+
 class DeepQNetwork:
     def __init__(
             self,
@@ -64,10 +64,8 @@ class DeepQNetwork:
         self.time = 0
         self.episode = 0
 
-        # initialize zero memory [s, a, r, s_]
         self.memory = deque()
 
-        # consist of [target_net, evaluate_net]
         self._build_net()
         t_params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="target_net")
         e_params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="eval_net")
@@ -90,12 +88,11 @@ class DeepQNetwork:
         self.sess.run(self.replace_target_op)
 
     def _build_net(self):
-        # ------------------ build evaluate_net ------------------
-        self.s = tf.placeholder(tf.float32, [None, STATE_LENGTH, WIDTH, HEIGHT], name='s')  # input
+        # build evaluate_net
+        self.s = tf.placeholder(tf.float32, [None, STATE_LENGTH, WIDTH, HEIGHT], name='s') 
         self.a = tf.placeholder(tf.int64, [None])
         self.y = tf.placeholder(tf.float32, [None])
 
-        #self.q_target = tf.placeholder(tf.float32, [None, self.n_actions], name='Q_target')  # for calculating loss
         with tf.variable_scope('eval_net'):
             x = tf.layers.conv2d(self.s, 32, 8, (4, 4), activation=tf.nn.relu, data_format='channels_first')
             x = tf.layers.conv2d(x, 64, 4, (2, 2), activation=tf.nn.relu, data_format='channels_first')
@@ -111,7 +108,7 @@ class DeepQNetwork:
         with tf.variable_scope('train'):
             self._train_op = tf.train.RMSPropOptimizer(self.lr, momentum=MOMENTUM, epsilon=MIN_GRAD).minimize(self.loss)
 
-        # ------------------ build target_net ------------------
+        # build target_net
         self.st = tf.placeholder(tf.float32, [None, STATE_LENGTH, WIDTH, HEIGHT], name='st')    # input
         with tf.variable_scope('target_net'):
             x = tf.layers.conv2d(self.st, 32, 8, (4, 4), activation=tf.nn.relu, data_format='channels_first')
@@ -123,13 +120,12 @@ class DeepQNetwork:
 
     def choose_action(self, state):
         if not TRAIN:
-            actions_value = self.sess.run(self.q_eval, feed_dict={self.s: [np.float32(state / 255.0)]})
+            actions_value = self.q_eval.eval(feed_dict={self.s: [np.float32(state / 255.0)]})
             action = np.argmax(actions_value)
             return action
 
         if np.random.uniform() > self.epsilon and self.learn_step_counter >= START_LEARNING:
-            # forward feed the state and get q value for every actions
-            actions_value = self.sess.run(self.q_eval, feed_dict={self.s: [np.float32(state / 255.0)]})
+            actions_value = self.q_eval.eval(feed_dict={self.s: [np.float32(state / 255.0)]})
             action = np.argmax(actions_value)
         else:
             action = np.random.randint(0, self.n_actions)
@@ -152,7 +148,6 @@ class DeepQNetwork:
         terminal_batch = []
         y_batch = []
 
-        # Sample random minibatch of transition from replay memory
         minibatch = random.sample(self.memory, BATCH_SIZE)
         for data in minibatch:
             state_batch.append(data[0])
@@ -161,11 +156,15 @@ class DeepQNetwork:
             next_state_batch.append(data[3])
             terminal_batch.append(data[4])
 
-        # Convert True to 1, False to 0
         terminal_batch = np.array(terminal_batch) + 0
 
         target_q_values_batch = self.target_q_eval.eval(feed_dict={self.st: np.float32(np.array(next_state_batch) / 255.0)})
-        y_batch = reward_batch + (1 - terminal_batch) * GAMMA * np.max(target_q_values_batch, axis=1)
+        if DDQN:
+            next_action_batch = np.argmax(self.q_eval.eval(feed_dict={self.s: np.float32(np.array(next_state_batch) / 255.0)}), axis=1)
+            for i in range(BATCH_SIZE):
+                y_batch.append(reward_batch[i] + (1 - terminal_batch[i]) * GAMMA * target_q_values_batch[i][next_action_batch[i]])
+        else:
+            y_batch = reward_batch + (1 - terminal_batch) * GAMMA * np.max(target_q_values_batch, axis=1)
 
         loss, _ = self.sess.run([self.loss, self._train_op], feed_dict={
             self.s: np.float32(np.array(state_batch) / 255.0),
@@ -187,7 +186,6 @@ class DeepQNetwork:
             if self.learn_step_counter % TRAIN_INTERVAL == 0:
                 self.train_network()
 
-            # check to replace target parameters
             if self.learn_step_counter % self.replace_target_iter == 0:
                 self.sess.run(self.replace_target_op)
                 print('\ntarget_params_replaced\n')
@@ -275,7 +273,6 @@ def main():
                 processed_observation = preprocess(observation, last_observation)
                 state = agent.learn(state, action, reward, done, processed_observation)
     else:
-        # env.monitor.start(ENV_NAME + '-test')
         for _ in range(NUM_EPISODES_AT_TEST):
             done = False
             observation = env.reset()
@@ -290,7 +287,6 @@ def main():
                 env.render()
                 processed_observation = preprocess(observation, last_observation)
                 state = np.append(state[1:, :, :], processed_observation, axis=0)
-        # env.monitor.close()
 
 if __name__ == '__main__':
     main()
