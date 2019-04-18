@@ -7,11 +7,12 @@ from skimage.color import rgb2gray
 from skimage.transform import resize
 
 ENV_NAME = 'Breakout-v0'  # Environment name
+BATCHSIZE = 512
 WIDTH = 84  # Resized frame width
 HEIGHT = 84  # Resized frame height
 NUM_EPISODES = 12000  # Number of episodes the agent plays
 STATE_LENGTH = 4  # Number of most recent frames to produce the input to the network
-LR = 0.00025                   # learning rate
+LR = 0.00001                   # learning rate
 # MOMENTUM = 0.95  # Momentum used by RMSProp
 # MIN_GRAD = 0.01  # Constant added to the squared gradient in the denominator of the RMSProp update
 GAMMA = 0.99                 # reward discount
@@ -45,7 +46,7 @@ class PolicyGradient:
         self._build_net()
 
         self.sess = tf.InteractiveSession()
-        self.saver = tf.train.Saver(e_params)
+        self.saver = tf.train.Saver()
         self.summary_placeholders, self.update_ops, self.summary_op = self.setup_summary()
         self.summary_writer = tf.summary.FileWriter(SAVE_SUMMARY_PATH, self.sess.graph)
 
@@ -100,23 +101,29 @@ class PolicyGradient:
         self.memory[1].append(action)
         self.memory[2].append(reward)
 
-        if self.episode % SAVE_INTERVAL == 0:
-            save_path = self.saver.save(self.sess, SAVE_NETWORK_PATH + '/' + ENV_NAME, global_step=self.episode)
-            print('Successfully saved: ' + save_path)
-
         self.total_reward += reward
         self.time += 1
 
         if done:
+            if self.episode % SAVE_INTERVAL == 0:
+                save_path = self.saver.save(self.sess, SAVE_NETWORK_PATH + '/' + ENV_NAME, global_step=self.episode)
+                print('Successfully saved: ' + save_path)
+
             discount_norm_r = self._discount_and_norm_rewards()
 
-            loss, _ = self.sess.run([self.loss, self._train_op], feed_dict={
-                self.s: np.float32(np.array(self.memory[0]) / 255.0),
-                self.a: self.memory[1],
-                self.r: discount_norm_r
-            })
+            assert self.time == len(self.memory[2])
+            for i in range((self.time-1)//BATCHSIZE + 1):
+                s = self.memory[0][512*i:512*(i+1)]
+                a = self.memory[1][512*i:512*(i+1)]
+                r = discount_norm_r[512*i:512*(i+1)]
+                loss, _ = self.sess.run([self.loss, self._train_op], feed_dict={
+                    self.s: np.float32(np.array(s) / 255.0),
+                    self.a: a,
+                    self.r: r
+                })
 
-            self.total_loss = loss
+                self.total_loss += loss
+            self.total_loss /= ((self.time-1)//BATCHSIZE + 1)
 
             stats = [self.total_reward, self.time, self.total_loss]
             for i in range(len(stats)):
@@ -125,9 +132,8 @@ class PolicyGradient:
             summary_str = self.sess.run(self.summary_op)
             self.summary_writer.add_summary(summary_str, self.episode + 1)
 
-            print('EPISODE: {0:6d} \t TIME: {2:5d} \t EPSILON: {3:.4f}\nTOTAL_REWARD: {4:3.0f} \t AVG_LOSS: {6:.5f}'.format(
-                self.episode + 1, self.time, self.epsilon,
-                self.total_reward, self.total_loss))
+            print('EPISODE: {:d} \t TIME: {:d} \t TOTAL_REWARD: {:.2f} \t AVG_LOSS: {:.5f}'.format(
+                self.episode + 1, self.time, float(self.total_reward), self.total_loss))
 
             self.total_reward = 0
             self.total_loss = 0
@@ -146,7 +152,8 @@ class PolicyGradient:
             discount_norm_r[i] = discount_r
 
         discount_norm_r -= np.mean(discount_norm_r)
-        discount_norm_r /= np.std(discount_norm_r)
+        if np.std(discount_norm_r) != 0:
+            discount_norm_r /= np.std(discount_norm_r)
         return discount_norm_r
 
     def setup_summary(self):
