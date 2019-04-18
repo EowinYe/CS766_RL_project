@@ -44,7 +44,6 @@ class DeepQNetwork:
             replace_target_iter=TARGET_REPLACE_ITER,
             memory_size=MEMORY_CAPACITY,
             batch_size=BATCH_SIZE,
-            output_graph=False,
     ):
         self.n_actions = n_actions
         self.lr = learning_rate
