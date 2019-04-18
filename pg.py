@@ -6,13 +6,13 @@ import tensorflow as tf
 from skimage.color import rgb2gray
 from skimage.transform import resize
 
-ENV_NAME = 'Breakout-v0'  # Environment name
+ENV_NAME = 'Pong-v0'  # Environment name
 BATCHSIZE = 512
 WIDTH = 84  # Resized frame width
 HEIGHT = 84  # Resized frame height
 NUM_EPISODES = 12000  # Number of episodes the agent plays
 STATE_LENGTH = 4  # Number of most recent frames to produce the input to the network
-LR = 0.00001                   # learning rate
+LR = 1e-3                   # learning rate
 # MOMENTUM = 0.95  # Momentum used by RMSProp
 # MIN_GRAD = 0.01  # Constant added to the squared gradient in the denominator of the RMSProp update
 GAMMA = 0.99                 # reward discount
