@@ -33,6 +33,7 @@ MODEL_NAME = 'DDQN-' if DDQN else 'DQN-'
 SAVE_NETWORK_PATH = 'saved_networks/' + MODEL_NAME + ENV_NAME
 SAVE_SUMMARY_PATH = 'summary/' + MODEL_NAME + ENV_NAME
 NUM_EPISODES_AT_TEST = 10  # Number of episodes the agent plays at test time
+DATAFORMAT = 'channels_last'
 
 
 class DeepQNetwork:
@@ -88,14 +89,17 @@ class DeepQNetwork:
 
     def _build_net(self):
         # build evaluate_net
-        self.s = tf.placeholder(tf.float32, [None, STATE_LENGTH, WIDTH, HEIGHT], name='s') 
+        self.s = tf.placeholder(tf.float32, [None, STATE_LENGTH, WIDTH, HEIGHT], name='s')
+        x = self.s
+        if DATAFORMAT == "channels_last":
+            x = tf.transpose(x, [0, 2, 3, 1])
         self.a = tf.placeholder(tf.int64, [None])
         self.y = tf.placeholder(tf.float32, [None])
 
         with tf.variable_scope('eval_net'):
-            x = tf.layers.conv2d(self.s, 32, 8, (4, 4), activation=tf.nn.relu, data_format='channels_first')
-            x = tf.layers.conv2d(x, 64, 4, (2, 2), activation=tf.nn.relu, data_format='channels_first')
-            x = tf.layers.conv2d(x, 64, 3, (1, 1), activation=tf.nn.relu, data_format='channels_first')
+            x = tf.layers.conv2d(x, 32, 8, (4, 4), activation=tf.nn.relu, data_format=DATAFORMAT)
+            x = tf.layers.conv2d(x, 64, 4, (2, 2), activation=tf.nn.relu, data_format=DATAFORMAT)
+            x = tf.layers.conv2d(x, 64, 3, (1, 1), activation=tf.nn.relu, data_format=DATAFORMAT)
             x = tf.contrib.layers.flatten(x)
             x = tf.layers.dense(x, 512, activation=tf.nn.relu)
             self.q_eval = tf.layers.dense(x, self.n_actions)
@@ -109,10 +113,13 @@ class DeepQNetwork:
 
         # build target_net
         self.st = tf.placeholder(tf.float32, [None, STATE_LENGTH, WIDTH, HEIGHT], name='st')    # input
+        x = self.st
+        if DATAFORMAT == "channels_last":
+            x = tf.transpose(x, [0, 2, 3, 1])
         with tf.variable_scope('target_net'):
-            x = tf.layers.conv2d(self.st, 32, 8, (4, 4), activation=tf.nn.relu, data_format='channels_first')
-            x = tf.layers.conv2d(x, 64, 4, (2, 2), activation=tf.nn.relu, data_format='channels_first')
-            x = tf.layers.conv2d(x, 64, 3, (1, 1), activation=tf.nn.relu, data_format='channels_first')
+            x = tf.layers.conv2d(x, 32, 8, (4, 4), activation=tf.nn.relu, data_format=DATAFORMAT)
+            x = tf.layers.conv2d(x, 64, 4, (2, 2), activation=tf.nn.relu, data_format=DATAFORMAT)
+            x = tf.layers.conv2d(x, 64, 3, (1, 1), activation=tf.nn.relu, data_format=DATAFORMAT)
             x = tf.contrib.layers.flatten(x)
             x = tf.layers.dense(x, 512, activation=tf.nn.relu)
             self.target_q_eval = tf.layers.dense(x, self.n_actions)
