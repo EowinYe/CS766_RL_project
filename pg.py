@@ -6,8 +6,8 @@ import tensorflow as tf
 from skimage.color import rgb2gray
 from skimage.transform import resize
 
-ENV_NAME = 'Pong-v0'  # Environment name
-BATCHSIZE = 512
+ENV_NAME = 'Breakout-v0'  # Environment name
+BATCHSIZE = 1024
 WIDTH = 84  # Resized frame width
 HEIGHT = 84  # Resized frame height
 NUM_EPISODES = 12000  # Number of episodes the agent plays
@@ -111,19 +111,25 @@ class PolicyGradient:
 
             discount_norm_r = self._discount_and_norm_rewards()
 
-            assert self.time == len(self.memory[2])
-            for i in range((self.time-1)//BATCHSIZE + 1):
-                s = self.memory[0][512*i:512*(i+1)]
-                a = self.memory[1][512*i:512*(i+1)]
-                r = discount_norm_r[512*i:512*(i+1)]
+            if len(self.memory[2]) < BATCHSIZE:
                 loss, _ = self.sess.run([self.loss, self._train_op], feed_dict={
-                    self.s: np.float32(np.array(s) / 255.0),
+                    self.s: np.float32(np.array(self.memory[0]) / 255.0),
+                    self.a: self.memory[1],
+                    self.r: self.memory[2]
+                })
+                self.total_loss = loss
+            else:
+                index = np.random.choice(len(self.memory[2]), size=BATCHSIZE)
+                s = np.array(self.memory[0])[index]
+                a = np.array(self.memory[1])[index]
+                r = np.array(self.memory[2])[index]
+
+                loss, _ = self.sess.run([self.loss, self._train_op], feed_dict={
+                    self.s: np.float32(s / 255.0),
                     self.a: a,
                     self.r: r
                 })
-
-                self.total_loss += loss
-            self.total_loss /= ((self.time-1)//BATCHSIZE + 1)
+                self.total_loss = loss
 
             stats = [self.total_reward, self.time, self.total_loss]
             for i in range(len(stats)):
