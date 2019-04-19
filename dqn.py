@@ -74,7 +74,8 @@ class DeepQNetwork:
         self.sess = tf.InteractiveSession()
         self.saver = tf.train.Saver(e_params)
         self.summary_placeholders, self.update_ops, self.summary_op = self.setup_summary()
-        self.summary_writer = tf.summary.FileWriter(SAVE_SUMMARY_PATH, self.sess.graph)
+        if TRAIN:
+            self.summary_writer = tf.summary.FileWriter(SAVE_SUMMARY_PATH, self.sess.graph)
 
         if not os.path.exists(SAVE_NETWORK_PATH):
             os.makedirs(SAVE_NETWORK_PATH)
@@ -100,6 +101,8 @@ class DeepQNetwork:
             x = tf.layers.conv2d(x, 32, 8, (4, 4), activation=tf.nn.relu, data_format=DATAFORMAT)
             x = tf.layers.conv2d(x, 64, 4, (2, 2), activation=tf.nn.relu, data_format=DATAFORMAT)
             x = tf.layers.conv2d(x, 64, 3, (1, 1), activation=tf.nn.relu, data_format=DATAFORMAT)
+            if DATAFORMAT == "channels_last":
+                x = tf.transpose(x, [0, 3, 1, 2])
             x = tf.contrib.layers.flatten(x)
             x = tf.layers.dense(x, 512, activation=tf.nn.relu)
             self.q_eval = tf.layers.dense(x, self.n_actions)
@@ -120,6 +123,8 @@ class DeepQNetwork:
             x = tf.layers.conv2d(x, 32, 8, (4, 4), activation=tf.nn.relu, data_format=DATAFORMAT)
             x = tf.layers.conv2d(x, 64, 4, (2, 2), activation=tf.nn.relu, data_format=DATAFORMAT)
             x = tf.layers.conv2d(x, 64, 3, (1, 1), activation=tf.nn.relu, data_format=DATAFORMAT)
+            if DATAFORMAT == "channels_last":
+                x = tf.transpose(x, [0, 3, 1, 2])
             x = tf.contrib.layers.flatten(x)
             x = tf.layers.dense(x, 512, activation=tf.nn.relu)
             self.target_q_eval = tf.layers.dense(x, self.n_actions)
