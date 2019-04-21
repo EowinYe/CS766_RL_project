@@ -69,8 +69,7 @@ class PolicyGradient:
             a_one_hot = tf.one_hot(self.a, self.n_actions, 1.0, 0.0)
             pi_prob = tf.multiply(self.pi, a_one_hot)
             oldpi_prob = tf.multiply(self.oldpi, a_one_hot)
-            # ratio = tf.div(pi_prob, oldpi_prob)
-            ratio = tf.reduce_sum(-tf.log(pi_prob))
+            ratio = tf.div(pi_prob, oldpi_prob)
             surr = ratio * self.adv
             self.aloss = -tf.reduce_mean(tf.minimum(surr,
                 tf.clip_by_value(ratio, 1.-EPSILON, 1.+EPSILON)*self.adv))
