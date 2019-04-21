@@ -7,7 +7,7 @@ from skimage.color import rgb2gray
 from skimage.transform import resize
 
 ENV_NAME = 'Breakout-v0'  # Environment name
-BATCHSIZE = 32
+BATCHSIZE = 64
 WIDTH = 84  # Resized frame width
 HEIGHT = 84  # Resized frame height
 NUM_EPISODES = 12000  # Number of episodes the agent plays
@@ -17,8 +17,6 @@ C_LR = 0.0002
 EPSILON = 0.2
 A_UPDATE_STEPS = 10
 C_UPDATE_STEPS = 10
-# MOMENTUM = 0.95  # Momentum used by RMSProp
-# MIN_GRAD = 0.01  # Constant added to the squared gradient in the denominator of the RMSProp update
 GAMMA = 0.99                 # reward discount
 NO_OP_STEPS = 30  # Maximum number of "do nothing" actions to be performed by the agent at the start of an episode
 TRAIN = True
@@ -27,6 +25,7 @@ SAVE_INTERVAL = 1000  # The frequency with which the network is saved
 SAVE_NETWORK_PATH = 'saved_networks/PPO_' + ENV_NAME
 SAVE_SUMMARY_PATH = 'summary/PPO_' + ENV_NAME
 NUM_EPISODES_AT_TEST = 10  # Number of episodes the agent plays at test time
+DATAFORMAT = 'channels_first'
 
 
 class PolicyGradient:
@@ -93,11 +92,15 @@ class PolicyGradient:
             self.load_network()
 
     def _build_anet(self, name):
-        x = None
+        x = self.s
+        if DATAFORMAT == "channels_last":
+            x = tf.transpose(x, [0, 2, 3, 1])
         with tf.variable_scope(name):
-            x = tf.layers.conv2d(self.s, 32, 8, (4, 4), activation=tf.nn.relu, data_format='channels_first')
-            x = tf.layers.conv2d(x, 64, 4, (2, 2), activation=tf.nn.relu, data_format='channels_first')
-            x = tf.layers.conv2d(x, 64, 3, (1, 1), activation=tf.nn.relu, data_format='channels_first')
+            x = tf.layers.conv2d(x, 32, 8, (4, 4), activation=tf.nn.relu, data_format=DATAFORMAT)
+            x = tf.layers.conv2d(x, 64, 4, (2, 2), activation=tf.nn.relu, data_format=DATAFORMAT)
+            x = tf.layers.conv2d(x, 64, 3, (1, 1), activation=tf.nn.relu, data_format=DATAFORMAT)
+            if DATAFORMAT == "channels_last":
+                x = tf.transpose(x, [0, 3, 1, 2])
             x = tf.contrib.layers.flatten(x)
             x = tf.layers.dense(x, 512, activation=tf.nn.relu)
             x = tf.layers.dense(x, self.n_actions)
@@ -106,11 +109,13 @@ class PolicyGradient:
         return act_prob
 
     def _build_cnet(self, name):
-        x = None
+        x = self.s
+        if DATAFORMAT == "channels_last":
+            x = tf.transpose(x, [0, 2, 3, 1])
         with tf.variable_scope(name):
-            x = tf.layers.conv2d(self.s, 32, 8, (4, 4), activation=tf.nn.relu, data_format='channels_first')
-            x = tf.layers.conv2d(x, 64, 4, (2, 2), activation=tf.nn.relu, data_format='channels_first')
-            x = tf.layers.conv2d(x, 64, 3, (1, 1), activation=tf.nn.relu, data_format='channels_first')
+            x = tf.layers.conv2d(x, 32, 8, (4, 4), activation=tf.nn.relu, data_format=DATAFORMAT)
+            x = tf.layers.conv2d(x, 64, 4, (2, 2), activation=tf.nn.relu, data_format=DATAFORMAT)
+            x = tf.layers.conv2d(x, 64, 3, (1, 1), activation=tf.nn.relu, data_format=DATAFORMAT)
             x = tf.contrib.layers.flatten(x)
             x = tf.layers.dense(x, 512, activation=tf.nn.relu)
             x = tf.layers.dense(x, 1)
@@ -237,7 +242,7 @@ def main():
                 last_observation = observation
                 action = agent.choose_action(state)
                 observation, reward, done, _ = env.step(action)
-                env.render()
+                # env.render()
                 processed_observation = preprocess(observation, last_observation)
                 state = agent.learn(state, action, reward, done, processed_observation)
     else:
