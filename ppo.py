@@ -236,7 +236,7 @@ def main():
                 last_observation = observation
                 action = agent.choose_action(state)
                 observation, reward, done, _ = env.step(action)
-                # env.render()
+                env.render()
                 processed_observation = preprocess(observation, last_observation)
                 state = agent.learn(state, action, reward, done, processed_observation)
     else:
