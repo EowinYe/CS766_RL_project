@@ -7,7 +7,7 @@ from skimage.color import rgb2gray
 from skimage.transform import resize
 
 ENV_NAME = 'Breakout-v0'  # Environment name
-BATCHSIZE = 1024
+BATCHSIZE = 32
 WIDTH = 84  # Resized frame width
 HEIGHT = 84  # Resized frame height
 NUM_EPISODES = 12000  # Number of episodes the agent plays
@@ -48,7 +48,7 @@ class PolicyGradient:
         self.s = tf.placeholder(tf.float32, [None, STATE_LENGTH, WIDTH, HEIGHT], name='s')
 
         self.v = self._build_cnet("critic")
-        self.r = tf.placeholder(tf.float32, [None])
+        self.r = tf.placeholder(tf.float32, [None, 1])
         with tf.variable_scope('closs'):
             self.advantage = self.r - self.v
             self.closs = tf.reduce_mean(tf.square(self.advantage))
@@ -64,7 +64,7 @@ class PolicyGradient:
             self.update_oldpi_op = [tf.assign(o, p) for o, p in zip(oldpi_params, pi_params)]
 
         self.a = tf.placeholder(tf.int64, [None])
-        self.adv = tf.placeholder(tf.float32, [None])
+        self.adv = tf.placeholder(tf.float32, [None, 1])
         with tf.variable_scope('aloss'):
             a_one_hot = tf.one_hot(self.a, self.n_actions, 1.0, 0.0)
             pi_prob = tf.multiply(self.pi, a_one_hot)
@@ -132,6 +132,7 @@ class PolicyGradient:
         for i in range(len(reward_batch)-1, -1, -1):
             last_reward = reward_batch[i] + self.gamma*last_reward
             discount_r[i] = last_reward
+        discount_r = discount_r[:, np.newaxis]
 
         self.sess.run(self.update_oldpi_op)
         adv = self.advantage.eval(feed_dict={
