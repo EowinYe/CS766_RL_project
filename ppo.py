@@ -61,15 +61,16 @@ class PolicyGradient:
         pi_params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="pi")
         oldpi_params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="oldpi")
         with tf.variable_scope('update_oldpi'):
-            self.update_oldpi_op = [tf.assign(o, p) for o, p in zip(oldpi_params, pi_params)]
+            self.update_oldpi_op = [tf.assign(oldp, p) for oldp, p in zip(oldpi_params, pi_params)]
 
         self.a = tf.placeholder(tf.int64, [None])
         self.adv = tf.placeholder(tf.float32, [None, 1])
         with tf.variable_scope('aloss'):
             a_one_hot = tf.one_hot(self.a, self.n_actions, 1.0, 0.0)
-            pi_prob = tf.multiply(self.pi, a_one_hot)
-            oldpi_prob = tf.multiply(self.oldpi, a_one_hot)
-            ratio = tf.div(pi_prob, oldpi_prob)
+            pi_prob = tf.reduce_sum(tf.multiply(self.pi, a_one_hot), axis=1)
+            oldpi_prob = tf.reduce_sum(tf.multiply(self.oldpi, a_one_hot), axis=1)
+            # ratio = tf.div(pi_prob, oldpi_prob)
+            ratio = tf.exp(tf.log(pi_prob) - tf.log(oldpi_prob))
             surr = ratio * self.adv
             self.aloss = -tf.reduce_mean(tf.minimum(surr,
                 tf.clip_by_value(ratio, 1.-EPSILON, 1.+EPSILON)*self.adv))
