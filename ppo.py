@@ -24,8 +24,8 @@ NO_OP_STEPS = 30  # Maximum number of "do nothing" actions to be performed by th
 TRAIN = True
 LOAD_NETWORK = False
 SAVE_INTERVAL = 1000  # The frequency with which the network is saved
-SAVE_NETWORK_PATH = 'saved_networks/PG_' + ENV_NAME
-SAVE_SUMMARY_PATH = 'summary/PG_' + ENV_NAME
+SAVE_NETWORK_PATH = 'saved_networks/PPO_' + ENV_NAME
+SAVE_SUMMARY_PATH = 'summary/PPO_' + ENV_NAME
 NUM_EPISODES_AT_TEST = 10  # Number of episodes the agent plays at test time
 
 
