@@ -43,7 +43,7 @@ class PolicyGradient:
 
         self.memory = deque()
 
-        self.learn_step_counter = 0s
+        self.learn_step_counter = 0
 
         self.total_reward = 0
         self.total_loss = 0
