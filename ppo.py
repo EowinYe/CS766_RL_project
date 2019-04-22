@@ -157,7 +157,7 @@ class PolicyGradient:
             terminal_batch = []
             y_batch = []
 
-            minibatch = random.sample(self.memory, BATCH_SIZE)
+            minibatch = random.sample(self.memory, BATCHSIZE)
             for data in minibatch:
                 state_batch.append(data[0])
                 action_batch.append(data[1])
@@ -171,6 +171,7 @@ class PolicyGradient:
             y_batch = reward_batch + (1 - terminal_batch) * GAMMA * target_values_batch
 
             state_batch = np.float32(state_batch)
+            y_batch = np.array(y_batch)[:, np.newaxis]
 
             adv = self.advantage.eval(feed_dict={
                 self.s: state_batch,
