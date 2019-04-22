@@ -12,11 +12,11 @@ WIDTH = 84  # Resized frame width
 HEIGHT = 84  # Resized frame height
 NUM_EPISODES = 12000  # Number of episodes the agent plays
 STATE_LENGTH = 4  # Number of most recent frames to produce the input to the network
-A_LR = 0.0001
-C_LR = 0.0002
+A_LR = 2.5e-4
+C_LR = 5e-4
 EPSILON = 0.2
-A_UPDATE_STEPS = 10
-C_UPDATE_STEPS = 10
+A_UPDATE_STEPS = 4
+C_UPDATE_STEPS = 4
 GAMMA = 0.99                 # reward discount
 NO_OP_STEPS = 30  # Maximum number of "do nothing" actions to be performed by the agent at the start of an episode
 TRAIN = True
@@ -55,7 +55,7 @@ class PolicyGradient:
             self.ctrain_op = tf.train.AdamOptimizer(C_LR).minimize(self.closs)
 
         self.pi = self._build_anet("pi")
-        self.oldpi = self._build_anet("oldpi")
+        self.oldpi = self._build_anet("oldpi", trainable=False)
 
         pi_params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="pi")
         oldpi_params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="oldpi")
@@ -91,19 +91,19 @@ class PolicyGradient:
         if LOAD_NETWORK:
             self.load_network()
 
-    def _build_anet(self, name):
+    def _build_anet(self, name, trainable=True):
         x = self.s
         if DATAFORMAT == "channels_last":
             x = tf.transpose(x, [0, 2, 3, 1])
         with tf.variable_scope(name):
-            x = tf.layers.conv2d(x, 32, 8, (4, 4), activation=tf.nn.relu, data_format=DATAFORMAT)
-            x = tf.layers.conv2d(x, 64, 4, (2, 2), activation=tf.nn.relu, data_format=DATAFORMAT)
-            x = tf.layers.conv2d(x, 64, 3, (1, 1), activation=tf.nn.relu, data_format=DATAFORMAT)
+            x = tf.layers.conv2d(x, 32, 8, (4, 4), activation=tf.nn.relu, data_format=DATAFORMAT, trainable=trainable)
+            x = tf.layers.conv2d(x, 64, 4, (2, 2), activation=tf.nn.relu, data_format=DATAFORMAT, trainable=trainable)
+            x = tf.layers.conv2d(x, 64, 3, (1, 1), activation=tf.nn.relu, data_format=DATAFORMAT, trainable=trainable)
             if DATAFORMAT == "channels_last":
                 x = tf.transpose(x, [0, 3, 1, 2])
             x = tf.contrib.layers.flatten(x)
-            x = tf.layers.dense(x, 512, activation=tf.nn.relu)
-            x = tf.layers.dense(x, self.n_actions)
+            x = tf.layers.dense(x, 512, activation=tf.nn.relu, trainable=trainable)
+            x = tf.layers.dense(x, self.n_actions, trainable=trainable)
 
         act_prob = tf.nn.softmax(x)
         return act_prob
