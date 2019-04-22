@@ -67,7 +67,7 @@ class PolicyGradient:
         with tf.variable_scope('aloss'):
             a_one_hot = tf.one_hot(self.a, self.n_actions, 1.0, 0.0)
             pi_prob = tf.reduce_sum(tf.multiply(self.pi, a_one_hot), axis=1)
-            oldpi_prob = tf.reduce_sum(tf.multiply(self.oldpi, a_one_hot), axis=1)
+            oldpi_prob = tf.stop_gradient(tf.reduce_sum(tf.multiply(self.oldpi, a_one_hot), axis=1))
             # ratio = tf.div(pi_prob, oldpi_prob)
             ratio = tf.exp(tf.log(pi_prob) - tf.log(oldpi_prob))
             surr = ratio * self.adv
