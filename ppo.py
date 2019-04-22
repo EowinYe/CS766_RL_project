@@ -55,7 +55,10 @@ class PolicyGradient:
             self.ctrain_op = tf.train.AdamOptimizer(C_LR).minimize(self.closs)
 
         self.pi = self._build_anet("pi")
+        self.pi_dist = tf.distributions.Categorical(probs=self.pi)
+        self.action = self.pi_dist.sample(1)[0]
         self.oldpi = self._build_anet("oldpi", trainable=False)
+        self.oldpi_dist = tf.distributions.Categorical(probs=self.oldpi)
 
         pi_params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="pi")
         oldpi_params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="oldpi")
@@ -65,11 +68,14 @@ class PolicyGradient:
         self.a = tf.placeholder(tf.int64, [None])
         self.adv = tf.placeholder(tf.float32, [None, 1])
         with tf.variable_scope('aloss'):
-            a_one_hot = tf.one_hot(self.a, self.n_actions, 1.0, 0.0)
-            pi_prob = tf.reduce_sum(tf.multiply(self.pi, a_one_hot), axis=1)
-            oldpi_prob = tf.stop_gradient(tf.reduce_sum(tf.multiply(self.oldpi, a_one_hot), axis=1))
+            # a_one_hot = tf.one_hot(self.a, self.n_actions, 1.0, 0.0)
+            # pi_prob = tf.reduce_sum(tf.multiply(self.pi, a_one_hot), axis=1)
+            # oldpi_prob = tf.stop_gradient(tf.reduce_sum(tf.multiply(self.oldpi, a_one_hot), axis=1))
             # ratio = tf.div(pi_prob, oldpi_prob)
-            ratio = tf.exp(tf.log(pi_prob) - tf.log(oldpi_prob))
+            log_pi_prob = self.pi_dist.log_prob(self.a)
+            log_oldpi_prob = tf.stop_gradient(self.oldpi_dist.log_prob(self.a))
+            ratio = tf.exp(log_pi_prob - log_oldpi_prob)
+            ratio = tf.reshape(ratio, [-1, 1])
             surr = ratio * self.adv
             self.aloss = -tf.reduce_mean(tf.minimum(surr,
                 tf.clip_by_value(ratio, 1.-EPSILON, 1.+EPSILON)*self.adv))
@@ -123,8 +129,9 @@ class PolicyGradient:
         return x
 
     def choose_action(self, state):
-        act_prob = self.pi.eval(feed_dict={self.s: [np.float32(state / 255.0)]})
-        action = np.random.choice(range(act_prob.shape[1]), p=act_prob.ravel())
+        # act_prob = self.pi.eval(feed_dict={self.s: [np.float32(state / 255.0)]})
+        # action = np.random.choice(range(act_prob.shape[1]), p=act_prob.ravel())
+        action = self.action.eval(feed_dict={self.s: [np.float32(state / 255.0)]})
         return action
 
     def get_initial_state(self, observation, last_observation):
