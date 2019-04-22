@@ -6,8 +6,8 @@ import tensorflow as tf
 from skimage.color import rgb2gray
 from skimage.transform import resize
 
-ENV_NAME = 'Breakout-v0'  # Environment name
-BATCHSIZE = 64
+ENV_NAME = 'MsPacman-v0'  # Environment name
+BATCHSIZE = 32
 WIDTH = 84  # Resized frame width
 HEIGHT = 84  # Resized frame height
 NUM_EPISODES = 12000  # Number of episodes the agent plays
@@ -15,8 +15,8 @@ STATE_LENGTH = 4  # Number of most recent frames to produce the input to the net
 A_LR = 2.5e-4
 C_LR = 5e-4
 EPSILON = 0.2
-A_UPDATE_STEPS = 10
-C_UPDATE_STEPS = 10
+UPDATE_STEPS = 4
+TIME_HORIZON = 128
 GAMMA = 0.99                 # reward discount
 NO_OP_STEPS = 30  # Maximum number of "do nothing" actions to be performed by the agent at the start of an episode
 TRAIN = True
@@ -131,7 +131,7 @@ class PolicyGradient:
     def choose_action(self, state):
         # act_prob = self.pi.eval(feed_dict={self.s: [np.float32(state / 255.0)]})
         # action = np.random.choice(range(act_prob.shape[1]), p=act_prob.ravel())
-        action = self.action.eval(feed_dict={self.s: [np.float32(state / 255.0)]})
+        action = self.action.eval(feed_dict={self.s: [np.float32(state / 255.0)]})[0]
         return action
 
     def get_initial_state(self, observation, last_observation):
@@ -152,18 +152,24 @@ class PolicyGradient:
             self.s: state_batch,
             self.r: discount_r})
 
-        for i in range(A_UPDATE_STEPS):
-            aloss, _ =  self.sess.run([self.aloss, self.atrain_op], feed_dict={
-                self.s: state_batch,
-                self.a: action_batch,
-                self.adv: adv})
-            self.total_loss += aloss
+        for i in range(UPDATE_STEPS):
+            for j in range(TIME_HORIZON//BATCHSIZE):
+                if j*BATCHSIZE >= discount_r.shape[0]:
+                    break
+                sbj = state_batch[j*BATCHSIZE:(j+1)*BATCHSIZE]
+                abj = action_batch[j*BATCHSIZE:(j+1)*BATCHSIZE]
+                advbj = adv[j*BATCHSIZE:(j+1)*BATCHSIZE]
+                drbj = discount_r[j*BATCHSIZE:(j+1)*BATCHSIZE]
+                aloss, _ =  self.sess.run([self.aloss, self.atrain_op], feed_dict={
+                    self.s: sbj,
+                    self.a: abj,
+                    self.adv: advbj})
+                self.total_loss += aloss
 
-        for i in range(C_UPDATE_STEPS):
-            closs, _ =  self.sess.run([self.closs, self.ctrain_op], feed_dict={
-                self.s: state_batch,
-                self.r: discount_r})
-            self.total_loss += closs
+                closs, _ =  self.sess.run([self.closs, self.ctrain_op], feed_dict={
+                    self.s: sbj,
+                    self.r: drbj})
+                self.total_loss += closs
 
     def learn(self, state, action, reward, done, observation):
         next_state = np.append(state[1:, :, :], observation, axis=0)
@@ -176,7 +182,7 @@ class PolicyGradient:
         self.total_reward += reward
         self.time += 1
 
-        if self.time % BATCHSIZE == 0 or done:
+        if self.time % TIME_HORIZON == 0 or done:
             v_ = self.v.eval(feed_dict={self.s: [np.float32(next_state / 255.0)]})
             self.train_network(np.float32(np.array(self.memory[0]) / 255.0),
                 np.array(self.memory[1]), np.array(self.memory[2]), v_[0])
