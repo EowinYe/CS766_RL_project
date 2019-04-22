@@ -124,7 +124,7 @@ class PolicyGradient:
 
     def choose_action(self, state):
         act_prob = self.pi.eval(feed_dict={self.s: [np.float32(state / 255.0)]})
-        action = np.argmax(act_prob)
+        action = np.random.choice(range(act_prob.shape[1]), p=act_prob.ravel())
         return action
 
     def get_initial_state(self, observation, last_observation):
