@@ -168,8 +168,7 @@ class PolicyGradient:
             terminal_batch = np.array(terminal_batch) + 0
 
             target_values_batch = self.v.eval(feed_dict={self.s: np.float32(next_state_batch)})
-            np.reshape(target_values_batch, [-1])
-            y_batch = reward_batch + (1 - terminal_batch) * GAMMA * target_values_batch
+            y_batch = reward_batch + (1 - terminal_batch) * GAMMA * np.reshape(target_values_batch, [-1])
 
             state_batch = np.float32(state_batch)
             y_batch = np.array(y_batch)[:, np.newaxis]
