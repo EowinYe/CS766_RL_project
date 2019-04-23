@@ -1,6 +1,7 @@
 import gym
 
 from stable_baselines.common.policies import CnnPolicy
+from stable_baselines.common.cmd_util import make_atari_env
 from stable_baselines.common.vec_env import VecFrameStack
 from stable_baselines import PPO1
 
