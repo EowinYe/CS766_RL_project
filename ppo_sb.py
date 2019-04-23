@@ -3,7 +3,7 @@ import gym
 from stable_baselines.common.policies import CnnPolicy
 from stable_baselines.common.cmd_util import make_atari_env
 from stable_baselines.common.vec_env import VecFrameStack
-from stable_baselines import PPO1
+from stable_baselines import PPO2
 
 ENV_NAME = 'BreakoutNoFrameskip-v4'
 SAVE_NETWORK_PATH = 'saved_networks/PPO_stable_baselines/PPO1_' + ENV_NAME
@@ -13,13 +13,13 @@ env = make_atari_env(ENV_NAME, num_env=4, seed=0)
 env = VecFrameStack(env, n_stack=4)
 
 if TRAIN:
-    model = PPO1(CnnPolicy, env, verbose=1)
+    model = PPO2(CnnPolicy, env, verbose=1)
     model.learn(total_timesteps=1000000)
     model.save(SAVE_NETWORK_PATH)
 
     del model
 else:
-    model = PPO1.load(SAVE_NETWORK_PATH)
+    model = PPO2.load(SAVE_NETWORK_PATH)
     obs = env.reset()
     while True:
         action, _states = model.predict(obs)
