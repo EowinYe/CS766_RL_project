@@ -6,7 +6,7 @@ from stable_baselines.common.vec_env import VecFrameStack
 from stable_baselines import PPO2
 
 ENV_NAME = 'BreakoutNoFrameskip-v4'
-SAVE_NETWORK_PATH = 'saved_networks/PPO_stable_baselines/PPO1_' + ENV_NAME
+SAVE_NETWORK_PATH = 'saved_networks/PPO_stable_baselines/PPO2_' + ENV_NAME
 TRAIN = True
 
 env = make_atari_env(ENV_NAME, num_env=4, seed=0)
