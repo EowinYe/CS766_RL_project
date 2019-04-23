@@ -15,7 +15,7 @@ env = VecFrameStack(env, n_stack=4)
 
 if TRAIN:
     model = PPO2(CnnPolicy, env, verbose=1)
-    model.learn(total_timesteps=120000000)
+    model.learn(total_timesteps=120000000, tensorboard_log=SAVE_SUMMARY_PATH)
     model.save(SAVE_NETWORK_PATH)
 
     del model
