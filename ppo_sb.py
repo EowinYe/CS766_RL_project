@@ -1,15 +1,15 @@
 import gym
 
 from stable_baselines.common.policies import CnnPolicy
-from stable_baselines.common.vec_env import DummyVecEnv
+from stable_baselines.common.vec_env import VecFrameStack
 from stable_baselines import PPO1
 
 ENV_NAME = 'Breakout-v0'
 SAVE_NETWORK_PATH = 'saved_networks/PPO_stable_baselines/PPO1_' + ENV_NAME
 TRAIN = True
 
-env = gym.make(ENV_NAME)
-env = DummyVecEnv([lambda: env])
+env = make_atari_env(ENV_NAME, num_env=4, seed=0)
+env = VecFrameStack(env, n_stack=4)
 
 if TRAIN:
     model = PPO1(CnnPolicy, env, verbose=1)
