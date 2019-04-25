@@ -4,12 +4,14 @@ import numpy as np
 
 from stable_baselines.common.policies import CnnPolicy
 from stable_baselines.common.cmd_util import make_atari_env
-from stable_baselines.common.vec_env import VecFrameStack
+from stable_baselines.common.vec_env import VecVideoRecorder, VecFrameStack, DummyVecEnv
 from stable_baselines import PPO2
 
 ENV_NAME = 'BreakoutNoFrameskip-v4'
 SAVE_NETWORK_PATH = 'saved_networks/PPO_stable_baselines/PPO2_' + ENV_NAME
 SAVE_SUMMARY_PATH = 'summary/PPO_stable_baselines/PPO2_' + ENV_NAME
+VIDEO_FOLDER = 'video/stable_baselines/'
+VIDEO_LENGTH = 2000
 TRAIN = False
 
 num_env = 1
@@ -25,16 +27,18 @@ if TRAIN:
 
     del model
 else:
-    model = PPO2.load(SAVE_NETWORK_PATH)
     obs = env.reset()
-    images = []
+    env = VecVideoRecorder(env, VIDEO_FOLDER,
+                           record_video_trigger=lambda x: x == 0, video_length=VIDEO_LENGTH,
+                           name_prefix="PPO_"+ENV_NAME)
+    env.reset()
+    model = PPO2.load(SAVE_NETWORK_PATH)
     cnt = 0
-    while True:
-        images.append(obs)
+    for i in range(VIDEO_LENGTH):
         action, _states = model.predict(obs)
         obs, rewards, done, info = env.step(action)
         env.render()
         cnt += int(done)
         if cnt==5:
             break
-    imageio.mimsave('video/stable_baselines/PPO2_'+ENV_NAME, [np.array(img[0]) for i, img in enumerate(images) if i%2 == 0], fps=29)
+env.close()
