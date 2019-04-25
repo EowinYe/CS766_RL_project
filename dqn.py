@@ -33,7 +33,7 @@ MODEL_NAME = 'DDQN-' if DDQN else 'DQN-'
 SAVE_NETWORK_PATH = 'saved_networks/' + MODEL_NAME + ENV_NAME
 SAVE_SUMMARY_PATH = 'summary/' + MODEL_NAME + ENV_NAME
 NUM_EPISODES_AT_TEST = 10  # Number of episodes the agent plays at test time
-DATAFORMAT = 'channels_last'
+DATAFORMAT = 'channels_first'
 
 
 class DeepQNetwork:
@@ -266,6 +266,7 @@ def preprocess(observation, last_observation):
 
 def main():
     env = gym.make(ENV_NAME)
+    env = gym.wrappers.Monitor(env, 'vedio/DDQN_'+ENV_NAME, force = True)
     agent = DeepQNetwork(n_actions=env.action_space.n)
 
     if TRAIN:
@@ -298,6 +299,7 @@ def main():
                 env.render()
                 processed_observation = preprocess(observation, last_observation)
                 state = np.append(state[1:, :, :], processed_observation, axis=0)
+    env.close()
 
 if __name__ == '__main__':
     main()
