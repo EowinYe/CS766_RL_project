@@ -266,7 +266,7 @@ def preprocess(observation, last_observation):
 
 def main():
     env = gym.make(ENV_NAME)
-    env = gym.wrappers.Monitor(env, 'vedio/DDQN_'+ENV_NAME, force = True)
+    env = gym.wrappers.Monitor(env, 'vedio/'+MODEL_NAME+ENV_NAME, force = True)
     agent = DeepQNetwork(n_actions=env.action_space.n)
 
     if TRAIN:
