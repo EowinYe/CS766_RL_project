@@ -7,7 +7,7 @@ from stable_baselines.common.cmd_util import make_atari_env
 from stable_baselines.common.vec_env import VecVideoRecorder, VecFrameStack, DummyVecEnv
 from stable_baselines import PPO2
 
-ENV_NAME = 'BreakoutNoFrameskip-v4'
+ENV_NAME = 'MsPacmanNoFrameskip-v4'
 SAVE_NETWORK_PATH = 'saved_networks/PPO_stable_baselines/PPO2_' + ENV_NAME
 SAVE_SUMMARY_PATH = 'summary/PPO_stable_baselines/PPO2_' + ENV_NAME
 VIDEO_FOLDER = 'video/stable_baselines/'
