@@ -28,12 +28,12 @@ NO_OP_STEPS = 30  # Maximum number of "do nothing" actions to be performed by th
 TRAIN = False
 LOAD_NETWORK = True
 SAVE_INTERVAL = 300000  # The frequency with which the network is saved
-DDQN = True
+DDQN = False
 MODEL_NAME = 'DDQN-' if DDQN else 'DQN-'
 SAVE_NETWORK_PATH = 'saved_networks/' + MODEL_NAME + ENV_NAME
 SAVE_SUMMARY_PATH = 'summary/' + MODEL_NAME + ENV_NAME
 NUM_EPISODES_AT_TEST = 10  # Number of episodes the agent plays at test time
-DATAFORMAT = 'channels_last'
+DATAFORMAT = 'channels_first'
 
 
 class DeepQNetwork:
@@ -266,6 +266,7 @@ def preprocess(observation, last_observation):
 
 def main():
     env = gym.make(ENV_NAME)
+    # env = gym.wrappers.Monitor(env, 'video/'+MODEL_NAME+ENV_NAME, force = True)
     agent = DeepQNetwork(n_actions=env.action_space.n)
 
     if TRAIN:
@@ -284,6 +285,7 @@ def main():
                 processed_observation = preprocess(observation, last_observation)
                 state = agent.learn(state, action, reward, done, processed_observation)
     else:
+        total_reward = 0
         for _ in range(NUM_EPISODES_AT_TEST):
             done = False
             observation = env.reset()
@@ -294,10 +296,14 @@ def main():
             while not done:
                 last_observation = observation
                 action = agent.choose_action(state)
-                observation, _, done, _ = env.step(action)
+                observation, reward, done, _ = env.step(action)
+                total_reward += reward
                 env.render()
                 processed_observation = preprocess(observation, last_observation)
                 state = np.append(state[1:, :, :], processed_observation, axis=0)
+        total_reward = total_reward / 10
+        print("Mean total reward: " + str(total_reward))
+    env.close()
 
 if __name__ == '__main__':
     main()

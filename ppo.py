@@ -5,20 +5,24 @@ import numpy as np
 import tensorflow as tf
 from skimage.color import rgb2gray
 from skimage.transform import resize
+from collections import deque
 
 ENV_NAME = 'Breakout-v0'  # Environment name
-BATCHSIZE = 64
+BATCHSIZE = 32
 WIDTH = 84  # Resized frame width
 HEIGHT = 84  # Resized frame height
 NUM_EPISODES = 12000  # Number of episodes the agent plays
 STATE_LENGTH = 4  # Number of most recent frames to produce the input to the network
-A_LR = 0.0001
-C_LR = 0.0002
+A_LR = 2.5e-4
+C_LR = 5e-4
 EPSILON = 0.2
-A_UPDATE_STEPS = 10
-C_UPDATE_STEPS = 10
+UPDATE_STEPS = 10
+TIME_HORIZON = 128
 GAMMA = 0.99                 # reward discount
 NO_OP_STEPS = 30  # Maximum number of "do nothing" actions to be performed by the agent at the start of an episode
+START_LEARNING = 20000
+MEMORY_CAPACITY = 400000
+TRAIN_INTERVAL = 4  # The agent selects 4 actions between successive updates
 TRAIN = True
 LOAD_NETWORK = False
 SAVE_INTERVAL = 1000  # The frequency with which the network is saved
@@ -37,7 +41,9 @@ class PolicyGradient:
         self.n_actions = n_actions
         self.gamma = reward_decay
 
-        self.memory = [[], [], []]
+        self.memory = deque()
+
+        self.learn_step_counter = 0
 
         self.total_reward = 0
         self.total_loss = 0
@@ -55,7 +61,10 @@ class PolicyGradient:
             self.ctrain_op = tf.train.AdamOptimizer(C_LR).minimize(self.closs)
 
         self.pi = self._build_anet("pi")
-        self.oldpi = self._build_anet("oldpi")
+        self.pi_dist = tf.distributions.Categorical(probs=self.pi)
+        self.action = self.pi_dist.sample(1)[0]
+        self.oldpi = self._build_anet("oldpi", trainable=False)
+        self.oldpi_dist = tf.distributions.Categorical(probs=self.oldpi)
 
         pi_params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="pi")
         oldpi_params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="oldpi")
@@ -65,11 +74,14 @@ class PolicyGradient:
         self.a = tf.placeholder(tf.int64, [None])
         self.adv = tf.placeholder(tf.float32, [None, 1])
         with tf.variable_scope('aloss'):
-            a_one_hot = tf.one_hot(self.a, self.n_actions, 1.0, 0.0)
-            pi_prob = tf.reduce_sum(tf.multiply(self.pi, a_one_hot), axis=1)
-            oldpi_prob = tf.reduce_sum(tf.multiply(self.oldpi, a_one_hot), axis=1)
+            # a_one_hot = tf.one_hot(self.a, self.n_actions, 1.0, 0.0)
+            # pi_prob = tf.reduce_sum(tf.multiply(self.pi, a_one_hot), axis=1)
+            # oldpi_prob = tf.stop_gradient(tf.reduce_sum(tf.multiply(self.oldpi, a_one_hot), axis=1))
             # ratio = tf.div(pi_prob, oldpi_prob)
-            ratio = tf.exp(tf.log(pi_prob) - tf.log(oldpi_prob))
+            log_pi_prob = self.pi_dist.log_prob(self.a)
+            log_oldpi_prob = tf.stop_gradient(self.oldpi_dist.log_prob(self.a))
+            ratio = tf.exp(log_pi_prob - log_oldpi_prob)
+            ratio = tf.reshape(ratio, [-1, 1])
             surr = ratio * self.adv
             self.aloss = -tf.reduce_mean(tf.minimum(surr,
                 tf.clip_by_value(ratio, 1.-EPSILON, 1.+EPSILON)*self.adv))
@@ -91,19 +103,19 @@ class PolicyGradient:
         if LOAD_NETWORK:
             self.load_network()
 
-    def _build_anet(self, name):
+    def _build_anet(self, name, trainable=True):
         x = self.s
         if DATAFORMAT == "channels_last":
             x = tf.transpose(x, [0, 2, 3, 1])
         with tf.variable_scope(name):
-            x = tf.layers.conv2d(x, 32, 8, (4, 4), activation=tf.nn.relu, data_format=DATAFORMAT)
-            x = tf.layers.conv2d(x, 64, 4, (2, 2), activation=tf.nn.relu, data_format=DATAFORMAT)
-            x = tf.layers.conv2d(x, 64, 3, (1, 1), activation=tf.nn.relu, data_format=DATAFORMAT)
+            x = tf.layers.conv2d(x, 32, 8, (4, 4), activation=tf.nn.relu, data_format=DATAFORMAT, trainable=trainable)
+            x = tf.layers.conv2d(x, 64, 4, (2, 2), activation=tf.nn.relu, data_format=DATAFORMAT, trainable=trainable)
+            x = tf.layers.conv2d(x, 64, 3, (1, 1), activation=tf.nn.relu, data_format=DATAFORMAT, trainable=trainable)
             if DATAFORMAT == "channels_last":
                 x = tf.transpose(x, [0, 3, 1, 2])
             x = tf.contrib.layers.flatten(x)
-            x = tf.layers.dense(x, 512, activation=tf.nn.relu)
-            x = tf.layers.dense(x, self.n_actions)
+            x = tf.layers.dense(x, 512, activation=tf.nn.relu, trainable=trainable)
+            x = tf.layers.dense(x, self.n_actions, trainable=trainable)
 
         act_prob = tf.nn.softmax(x)
         return act_prob
@@ -123,57 +135,75 @@ class PolicyGradient:
         return x
 
     def choose_action(self, state):
-        act_prob = self.pi.eval(feed_dict={self.s: [np.float32(state / 255.0)]})
-        action = np.argmax(act_prob)
+        # act_prob = self.pi.eval(feed_dict={self.s: [np.float32(state / 255.0)]})
+        # action = np.random.choice(range(act_prob.shape[1]), p=act_prob.ravel())
+        action = self.action.eval(feed_dict={self.s: [np.float32(state)]})[0]
         return action
 
     def get_initial_state(self, observation, last_observation):
         processed_observation = np.maximum(observation, last_observation)
-        processed_observation = np.uint8(resize(rgb2gray(processed_observation), (WIDTH, HEIGHT)) * 255)
+        processed_observation = np.array((resize(rgb2gray(processed_observation), (WIDTH, HEIGHT)) * 255)/255, dtype=np.float32)
         state = [processed_observation for _ in range(STATE_LENGTH)]
         return np.stack(state, axis=0)
 
-    def train_network(self, state_batch, action_batch, reward_batch, last_reward):
-        discount_r = np.zeros_like(reward_batch)
-        for i in range(len(reward_batch)-1, -1, -1):
-            last_reward = reward_batch[i] + self.gamma*last_reward
-            discount_r[i] = last_reward
-        discount_r = discount_r[:, np.newaxis]
-
+    def train_network(self):
         self.sess.run(self.update_oldpi_op)
-        adv = self.advantage.eval(feed_dict={
-            self.s: state_batch,
-            self.r: discount_r})
 
-        for i in range(A_UPDATE_STEPS):
+        for i in range(UPDATE_STEPS):
+            state_batch = []
+            action_batch = []
+            reward_batch = []
+            next_state_batch = []
+            terminal_batch = []
+            y_batch = []
+
+            minibatch = random.sample(self.memory, BATCHSIZE)
+            for data in minibatch:
+                state_batch.append(data[0])
+                action_batch.append(data[1])
+                reward_batch.append(data[2])
+                next_state_batch.append(data[3])
+                terminal_batch.append(data[4])
+
+            terminal_batch = np.array(terminal_batch) + 0
+
+            target_values_batch = self.v.eval(feed_dict={self.s: np.float32(next_state_batch)})
+            y_batch = reward_batch + (1 - terminal_batch) * GAMMA * np.reshape(target_values_batch, [-1])
+
+            state_batch = np.float32(state_batch)
+            y_batch = np.array(y_batch)[:, np.newaxis]
+
+            adv = self.advantage.eval(feed_dict={
+                self.s: state_batch,
+                self.r: y_batch})
+
             aloss, _ =  self.sess.run([self.aloss, self.atrain_op], feed_dict={
                 self.s: state_batch,
                 self.a: action_batch,
                 self.adv: adv})
             self.total_loss += aloss
 
-        for i in range(C_UPDATE_STEPS):
             closs, _ =  self.sess.run([self.closs, self.ctrain_op], feed_dict={
                 self.s: state_batch,
-                self.r: discount_r})
+                self.r: y_batch})
             self.total_loss += closs
 
     def learn(self, state, action, reward, done, observation):
         next_state = np.append(state[1:, :, :], observation, axis=0)
         reward = np.clip(reward, -1, 1)
 
-        self.memory[0].append(state)
-        self.memory[1].append(action)
-        self.memory[2].append(reward)
+        self.memory.append((state, action, reward, next_state, done))
+        if len(self.memory) > MEMORY_CAPACITY:
+            self.memory.popleft()
 
         self.total_reward += reward
         self.time += 1
 
-        if self.time % BATCHSIZE == 0 or done:
-            v_ = self.v.eval(feed_dict={self.s: [np.float32(next_state / 255.0)]})
-            self.train_network(np.float32(np.array(self.memory[0]) / 255.0),
-                np.array(self.memory[1]), np.array(self.memory[2]), v_[0])
-            self.memory = [[], [], []]
+        self.learn_step_counter += 1
+
+        if self.learn_step_counter >= START_LEARNING:
+            if self.learn_step_counter % TRAIN_INTERVAL == 0:
+                self.train_network()
 
         if done:
             if self.episode % SAVE_INTERVAL == 0:
@@ -222,7 +252,7 @@ class PolicyGradient:
 
 def preprocess(observation, last_observation):
     processed_observation = np.maximum(observation, last_observation)
-    processed_observation = np.uint8(resize(rgb2gray(processed_observation), (WIDTH, HEIGHT)) * 255)
+    processed_observation = np.array((resize(rgb2gray(processed_observation), (WIDTH, HEIGHT)) * 255)/255, dtype=np.float32)
     return np.reshape(processed_observation, (1, WIDTH, HEIGHT))
 
 
