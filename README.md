@@ -11,6 +11,7 @@ Dongqiangzi Ye, Haozhen Wu, Jennifer Cao
 ### Usage
 
 If you want to run dqn, simply modify some parameters in the dqn.py and Run:
+
 	python dpn.py
 
 The same as other algorithms.
